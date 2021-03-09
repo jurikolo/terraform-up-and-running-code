@@ -1,23 +1,28 @@
 terraform {
-  required_version = ">= 0.12, < 0.13"
+  required_version = ">= 0.13"
+  required_providers {
+    aws = {
+      version = "~> 2.0"
+    }
+  }
 }
 
 provider "aws" {
-  region = "us-east-2"
-
-  # Allow any 2.x version of the AWS provider
-  version = "~> 2.0"
+  region = "eu-central-1"
+  profile = "terraform"
 }
 
 resource "aws_instance" "example" {
-  ami                    = "ami-0c55b159cbfafe1f0"
-  instance_type          = "t2.micro"
+  ami                    = "ami-016f4f002606a1417"
+  instance_type          = "t4g.micro"
   vpc_security_group_ids = [aws_security_group.instance.id]
 
   user_data = <<-EOF
               #!/bin/bash
-              echo "Hello, World" > index.html
-              nohup busybox httpd -f -p 8080 &
+              sudo yum update -y
+              sudo yum install httpd -y
+              sudo sed -i 's/Listen 80/Listen 8080/g' /etc/httpd/conf/httpd.conf
+              sudo systemctl start httpd
               EOF
 
   tags = {
@@ -33,6 +38,12 @@ resource "aws_security_group" "instance" {
     from_port   = 8080
     to_port     = 8080
     protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port = 80
+    protocol = "tcp"
+    to_port = 80
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
