@@ -1,23 +1,28 @@
 terraform {
-  required_version = ">= 0.12, < 0.13"
+  required_version = ">= 0.13"
+  required_providers {
+    aws = {
+      version = "~> 2.0"
+    }
+  }
 }
 
 provider "aws" {
-  region = "us-east-2"
-
-  # Allow any 2.x version of the AWS provider
-  version = "~> 2.0"
+  region = "eu-central-1"
+  profile = "terraform"
 }
 
 resource "aws_launch_configuration" "example" {
-  image_id        = "ami-0c55b159cbfafe1f0"
-  instance_type   = "t2.micro"
+  image_id        = "ami-016f4f002606a1417"
+  instance_type   = "t4g.micro"
   security_groups = [aws_security_group.instance.id]
 
   user_data = <<-EOF
               #!/bin/bash
-              echo "Hello, World" > index.html
-              nohup busybox httpd -f -p ${var.server_port} &
+              sudo yum update -y
+              sudo yum install httpd -y
+              sudo sed -i 's/Listen 80/Listen ${var.server_port}/g' /etc/httpd/conf/httpd.conf
+              sudo systemctl start httpd
               EOF
 
   # Required when using a launch configuration with an auto scaling group.
@@ -53,6 +58,12 @@ resource "aws_security_group" "instance" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+  egress {
+    from_port = 80
+    protocol = "tcp"
+    to_port = 80
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 }
 
 data "aws_vpc" "default" {
@@ -64,9 +75,7 @@ data "aws_subnet_ids" "default" {
 }
 
 resource "aws_lb" "example" {
-
   name               = var.alb_name
-
   load_balancer_type = "application"
   subnets            = data.aws_subnet_ids.default.ids
   security_groups    = [aws_security_group.alb.id]
@@ -113,8 +122,9 @@ resource "aws_lb_listener_rule" "asg" {
   priority     = 100
 
   condition {
-    field  = "path-pattern"
-    values = ["*"]
+    path_pattern {
+      values = ["*"]
+    }
   }
 
   action {
