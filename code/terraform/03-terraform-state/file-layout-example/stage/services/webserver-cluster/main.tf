@@ -1,34 +1,40 @@
 terraform {
-  required_version = ">= 0.12, < 0.13"
+  required_version = ">= 0.13"
+  required_providers {
+    aws = {
+      version = "~> 2.0"
+    }
+  }
+  backend "s3" {
+    bucket = "jurikolo-terraform"
+    key = "stage/services/webserver-cluster/terraform.tfstate"
+    region = "eu-central-1"
+    dynamodb_table = "jurikolo-terraform"
+    encrypt = true
+    profile = "terraform"
+  }
 }
 
 provider "aws" {
-  region = "us-east-2"
-
-  # Allow any 2.x version of the AWS provider
-  version = "~> 2.0"
+  region = "eu-central-1"
+  profile = "terraform"
 }
 
 resource "aws_launch_configuration" "example" {
-  image_id        = "ami-0c55b159cbfafe1f0"
-  instance_type   = "t2.micro"
+  image_id        = "ami-016f4f002606a1417"
+  instance_type   = "t4g.micro"
   security_groups = [aws_security_group.instance.id]
-  user_data       = data.template_file.user_data.rendered
+
+  user_data = templatefile("${path.module}/user-data.tpl", {
+    server_port = "8080",
+    db_address = data.terraform_remote_state.db.outputs.address,
+    db_port = data.terraform_remote_state.db.outputs.port
+  })
 
   # Required when using a launch configuration with an auto scaling group.
   # https://www.terraform.io/docs/providers/aws/r/launch_configuration.html
   lifecycle {
     create_before_destroy = true
-  }
-}
-
-data "template_file" "user_data" {
-  template = file("user-data.sh")
-
-  vars = {
-    server_port = var.server_port
-    db_address  = data.terraform_remote_state.db.outputs.address
-    db_port     = data.terraform_remote_state.db.outputs.port
   }
 }
 
@@ -39,8 +45,9 @@ resource "aws_autoscaling_group" "example" {
   target_group_arns = [aws_lb_target_group.asg.arn]
   health_check_type = "ELB"
 
+  desired_capacity = 2
   min_size = 2
-  max_size = 10
+  max_size = 4
 
   tag {
     key                 = "Name"
@@ -56,6 +63,18 @@ resource "aws_security_group" "instance" {
     from_port   = var.server_port
     to_port     = var.server_port
     protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port = 80
+    protocol = "tcp"
+    to_port = 80
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port = 443
+    protocol = "tcp"
+    to_port = 443
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
@@ -106,8 +125,9 @@ resource "aws_lb_listener_rule" "asg" {
   priority     = 100
 
   condition {
-    field  = "path-pattern"
-    values = ["*"]
+    path_pattern {
+      values = ["*"]
+    }
   }
 
   action {
@@ -142,7 +162,8 @@ data "terraform_remote_state" "db" {
   config = {
     bucket = var.db_remote_state_bucket
     key    = var.db_remote_state_key
-    region = "us-east-2"
+    region = "eu-central-1"
+    profile = "terraform"
   }
 }
 
