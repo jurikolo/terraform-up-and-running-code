@@ -1,12 +1,15 @@
 terraform {
-  required_version = ">= 0.12, < 0.13"
+  required_version = ">= 0.13"
+  required_providers {
+    aws = {
+      version = "~> 2.0"
+    }
+  }
 }
 
 provider "aws" {
-  region = "us-east-2"
-
-  # Allow any 2.x version of the AWS provider
-  version = "~> 2.0"
+  region = "eu-central-1"
+  profile = "terraform"
 }
 
 resource "aws_s3_bucket" "terraform_state" {
@@ -20,7 +23,7 @@ resource "aws_s3_bucket" "terraform_state" {
   # Enable versioning so we can see the full revision history of our
   # state files
   versioning {
-    enabled = true
+    enabled = false
   }
 
   # Enable server-side encryption by default
