@@ -38,6 +38,12 @@ resource "aws_autoscaling_group" "example" {
     value               = var.cluster_name
     propagate_at_launch = true
   }
+  tag {
+    key                 = "cost-center"
+    value               = "terraform-book"
+    propagate_at_launch = true
+  }
+
 }
 
 resource "aws_security_group" "instance" {
