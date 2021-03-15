@@ -1,9 +1,14 @@
 terraform {
-  required_version = ">= 0.12, < 0.13"
+  required_version = ">= 0.13"
+  required_providers {
+    aws = {
+      version = "~> 2.0"
+    }
+  }
 }
 
 resource "aws_launch_configuration" "example" {
-  image_id        = "ami-0c55b159cbfafe1f0"
+  image_id        = "ami-016f4f002606a1417"
   instance_type   = var.instance_type
   security_groups = [aws_security_group.instance.id]
 
@@ -23,7 +28,7 @@ resource "aws_launch_configuration" "example" {
 data "template_file" "user_data" {
   count = var.enable_new_user_data ? 0 : 1
 
-  template = file("${path.module}/user-data.sh")
+  template = file("${path.module}/user-data.tpl")
 
   vars = {
     server_port = var.server_port
@@ -35,14 +40,17 @@ data "template_file" "user_data" {
 data "template_file" "user_data_new" {
   count = var.enable_new_user_data ? 1 : 0
 
-  template = file("${path.module}/user-data-new.sh")
+  template = file("${path.module}/user-data-new.tpl")
 
   vars = {
     server_port = var.server_port
+    db_address  = data.terraform_remote_state.db.outputs.address
+    db_port     = data.terraform_remote_state.db.outputs.port
   }
 }
 
 resource "aws_autoscaling_group" "example" {
+  name = "${var.cluster_name}-${aws_launch_configuration.example.name}"
   launch_configuration = aws_launch_configuration.example.name
   vpc_zone_identifier  = data.aws_subnet_ids.default.ids
   target_group_arns    = [aws_lb_target_group.asg.arn]
@@ -109,6 +117,36 @@ resource "aws_security_group_rule" "allow_server_http_inbound" {
   cidr_blocks = local.all_ips
 }
 
+resource "aws_security_group_rule" "allow_server_ssh_inbound" {
+  type              = "ingress"
+  security_group_id = aws_security_group.instance.id
+
+  from_port   = local.ssh_port
+  to_port     = local.ssh_port
+  protocol    = local.tcp_protocol
+  cidr_blocks = local.all_ips
+}
+
+resource "aws_security_group_rule" "allow_server_http_outbound" {
+  type              = "egress"
+  security_group_id = aws_security_group.instance.id
+
+  from_port   = local.http_port
+  to_port     = local.http_port
+  protocol    = local.tcp_protocol
+  cidr_blocks = local.all_ips
+}
+
+resource "aws_security_group_rule" "allow_server_https_outbound" {
+  type              = "egress"
+  security_group_id = aws_security_group.instance.id
+
+  from_port   = local.https_port
+  to_port     = local.https_port
+  protocol    = local.tcp_protocol
+  cidr_blocks = local.all_ips
+}
+
 data "aws_vpc" "default" {
   default = true
 }
@@ -163,8 +201,9 @@ resource "aws_lb_listener_rule" "asg" {
   priority     = 100
 
   condition {
-    field  = "path-pattern"
-    values = ["*"]
+    path_pattern {
+      values = ["*"]
+    }
   }
 
   action {
@@ -203,7 +242,8 @@ data "terraform_remote_state" "db" {
   config = {
     bucket = var.db_remote_state_bucket
     key    = var.db_remote_state_key
-    region = "us-east-2"
+    region = "eu-central-1"
+    profile = "terraform"
   }
 }
 
@@ -244,7 +284,9 @@ resource "aws_cloudwatch_metric_alarm" "low_cpu_credit_balance" {
 }
 
 locals {
+  ssh_port     = 22
   http_port    = 80
+  https_port   = 443
   any_port     = 0
   any_protocol = "-1"
   tcp_protocol = "tcp"
