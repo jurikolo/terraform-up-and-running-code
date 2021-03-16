@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 0.12, < 0.13"
+  required_version = ">= 0.13"
 }
 
 resource "aws_launch_configuration" "example" {
@@ -95,6 +95,26 @@ resource "aws_security_group_rule" "allow_server_http_inbound" {
 
   from_port   = var.server_port
   to_port     = var.server_port
+  protocol    = local.tcp_protocol
+  cidr_blocks = local.all_ips
+}
+
+resource "aws_security_group_rule" "allow_server_http_outbound" {
+  type              = "egress"
+  security_group_id = aws_security_group.instance.id
+
+  from_port   = var.http_port
+  to_port     = var.http_port
+  protocol    = local.tcp_protocol
+  cidr_blocks = local.all_ips
+}
+
+resource "aws_security_group_rule" "allow_server_https_outbound" {
+  type              = "egress"
+  security_group_id = aws_security_group.instance.id
+
+  from_port   = var.https_port
+  to_port     = var.https_port
   protocol    = local.tcp_protocol
   cidr_blocks = local.all_ips
 }

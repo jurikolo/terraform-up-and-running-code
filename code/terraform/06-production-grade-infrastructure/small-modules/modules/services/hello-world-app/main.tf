@@ -1,7 +1,6 @@
 
 terraform {
-  # Require any 0.12.x version of Terraform
-  required_version = ">= 0.12, < 0.13"
+  required_version = ">= 0.13"
 }
 
 module "asg" {
@@ -9,8 +8,14 @@ module "asg" {
 
   cluster_name  = "hello-world-${var.environment}"
   ami           = var.ami
-  user_data     = data.template_file.user_data.rendered
   instance_type = var.instance_type
+
+  user_data = templatefile("${path.module}/user-data.tpl", {
+    server_port = var.server_port,
+    db_address = data.terraform_remote_state.db.outputs.address,
+    db_port = data.terraform_remote_state.db.outputs.port,
+    server_text = var.server_text
+  })
 
   min_size           = var.min_size
   max_size           = var.max_size
@@ -28,17 +33,6 @@ module "alb" {
 
   alb_name   = "hello-world-${var.environment}"
   subnet_ids = data.aws_subnet_ids.default.ids
-}
-
-data "template_file" "user_data" {
-  template = file("${path.module}/user-data.sh")
-
-  vars = {
-    server_port = var.server_port
-    db_address  = data.terraform_remote_state.db.outputs.address
-    db_port     = data.terraform_remote_state.db.outputs.port
-    server_text = var.server_text
-  }
 }
 
 resource "aws_lb_target_group" "asg" {
@@ -63,8 +57,9 @@ resource "aws_lb_listener_rule" "asg" {
   priority     = 100
 
   condition {
-    field  = "path-pattern"
-    values = ["*"]
+    path_pattern {
+      values = ["*"]
+    }
   }
 
   action {
@@ -77,9 +72,10 @@ data "terraform_remote_state" "db" {
   backend = "s3"
 
   config = {
-    bucket = var.db_remote_state_bucket
-    key    = var.db_remote_state_key
-    region = "us-east-2"
+    bucket  = var.db_remote_state_bucket
+    key     = var.db_remote_state_key
+    region  = "eu-central-1"
+    profile = "terraform"
   }
 }
 

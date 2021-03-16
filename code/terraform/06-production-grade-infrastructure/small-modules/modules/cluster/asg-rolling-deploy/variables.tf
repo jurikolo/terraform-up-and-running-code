@@ -68,7 +68,19 @@ variable "custom_tags" {
 }
 
 variable "server_port" {
-  description = "The port the server will use for HTTP requests"
+  description = "The port the server will use for incoming HTTP requests"
   type        = number
   default     = 8080
+}
+
+variable "http_port" {
+  description = "The port the server will use for outgoing HTTP requests"
+  type        = number
+  default     = 80
+}
+
+variable "https_port" {
+  description = "The port the server will use for outgoing HTTPS requests"
+  type        = number
+  default     = 443
 }

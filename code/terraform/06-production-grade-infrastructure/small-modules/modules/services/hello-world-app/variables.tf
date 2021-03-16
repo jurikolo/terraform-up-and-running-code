@@ -41,13 +41,13 @@ variable "db_remote_state_key" {
 variable "ami" {
   description = "The AMI to run in the cluster"
   type        = string
-  default     = "ami-0c55b159cbfafe1f0"
+  default     = "ami-016f4f002606a1417"
 }
 
 variable "instance_type" {
   description = "The type of EC2 Instances to run (e.g. t2.micro)"
   type        = string
-  default     = "t2.micro"
+  default     = "t4g.micro"
 }
 
 variable "server_text" {

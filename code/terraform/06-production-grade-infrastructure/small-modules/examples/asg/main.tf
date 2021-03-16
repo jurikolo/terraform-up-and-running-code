@@ -1,12 +1,15 @@
 terraform {
-  required_version = ">= 0.12, < 0.13"
+  required_version = ">= 0.13"
+  required_providers {
+    aws = {
+      version = "~> 2.0"
+    }
+  }
 }
 
 provider "aws" {
-  region = "us-east-2"
-
-  # Allow any 2.x version of the AWS provider
-  version = "~> 2.0"
+  region = "eu-central-1"
+  profile = "terraform"
 }
 
 module "asg" {
@@ -14,8 +17,8 @@ module "asg" {
 
   cluster_name  = var.cluster_name
 
-  ami           = "ami-0c55b159cbfafe1f0"
-  instance_type = "t2.micro"
+  ami           = "ami-016f4f002606a1417"
+  instance_type = "t4g.micro"
 
   min_size           = 1
   max_size           = 1
